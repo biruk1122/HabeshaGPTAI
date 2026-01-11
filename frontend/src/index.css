@@ -9,7 +9,7 @@
   --color-primary: #e6ccff;
 }
 
-@custom-variant dark(&:where(.dark,.dark *))
+@custom-variant dark (.dark &);
 
 ::-webkit-scrollbar {
   display: none;
