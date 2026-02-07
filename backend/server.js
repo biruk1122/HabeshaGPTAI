@@ -4,6 +4,7 @@ import 'dotenv/config.js';
 import connectDB from './configs/db.js';
 import userRoutes from './routes/userRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import messageRouter from './routes/messageRoutes.js';
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.use(express.json());
 app.get('/', (req, res) => res.send('HabeshaGPTAI Backend is running'));
 app.use('/api/user', userRoutes)
 app.use('/api/chat', chatRoutes)
+app.use('/api/message', messageRouter)
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
