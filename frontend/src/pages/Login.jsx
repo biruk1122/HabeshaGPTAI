@@ -1,15 +1,32 @@
 import { useState } from 'react'
+import { useAppContext } from '../contexts/AppContext';
+import toast from 'react-hot-toast';
 
 function Login() {
 
      const [state, setState] = useState("login");
-    const [name, setName] = useState("");
+    const [username, setUserName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const {axios, setToken} = useAppContext()
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async(e) => {
         e.preventDefault();
         // Handle login or registration logic here
+        const url = state === 'login' ? '/api/user/login' : '/api/user/register'
+        try{
+           const {data} = await axios.post(url, {username, email, password})
+           if(data.success){
+            setToken(data.token)
+            localStorage.setItem('token', data.token)
+
+           }else{
+            toast.error(data.message)
+           } 
+        }catch(error){
+            toast.error(error.message)
+        }
+        
     }
 
   return (
@@ -20,7 +37,7 @@ function Login() {
             {state === "register" && (
                 <div className="w-full">
                     <p>Name</p>
-                    <input onChange={(e) => setName(e.target.value)} value={name} placeholder="type here" className="border border-gray-200 rounded w-full p-2 mt-1 outline-indigo-500" type="text" required />
+                    <input onChange={(e) => setUserName(e.target.value)} value={username} placeholder="type here" className="border border-gray-200 rounded w-full p-2 mt-1 outline-indigo-500" type="text" required />
                 </div>
             )}
             <div className="w-full ">
