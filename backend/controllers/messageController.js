@@ -83,7 +83,7 @@ export const imageMessageController = async(req, res) => {
             isPublished
         }
 
-        res.json({sucess: true, reply})
+        res.json({success: true, reply})
 
         chat.messages.push(reply)
         await chat.save()

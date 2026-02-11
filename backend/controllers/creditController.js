@@ -28,9 +28,9 @@ const plans = [
 // API Controller for getting all plans
 export const getPlans = async (req, res) => {
     try{
-        res.json({sucess: true, plans})
+        res.json({success: true, plans})
     }catch(error){
-        res.json({sucess: false, message: error.message})
+        res.json({success: false, message: error.message})
 
     }
 }
@@ -45,7 +45,7 @@ export const purchasePlan = async (req, res) => {
         const plan = plans.find(plan => plan._id ===planId)
 
         if(!plan){
-            return res.json({sucess: false, message: "Invalid Plan"})
+            return res.json({success: false, message: "Invalid Plan"})
         }
 
         //Create new Transaction
@@ -81,9 +81,9 @@ export const purchasePlan = async (req, res) => {
             expires_at: Math.floor(Date.now() / 1000) + 30 * 60, 
         })
 
-        res.json({sucess: true, url: session.url})
+        res.json({success: true, url: session.url})
     }catch (error){
-        res.json({sucess: false, message: error.message})
+        res.json({success: false, message: error.message})
 
     }
 }
