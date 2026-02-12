@@ -84,8 +84,8 @@ function ChatBox() {
 
     {mode === 'image'&&(
       <label className="inline-flex items-center gap-2 mb-3 text-sm mx-auto">
-        <p className="text-xs">Published Generated Image to Community</p>
-        <input type='checkbox' className="cursore-pointer" checked={isPublished} onChange={(e)=>setIsPublished(e.target.checked)}/>
+        {/* <p className="text-xs">Published Generated Image to Community</p> */}
+        <input type='' className="cursore-pointer" checked={isPublished} onChange={(e)=>setIsPublished(e.target.checked)}/>
       </label>
     )}
 
