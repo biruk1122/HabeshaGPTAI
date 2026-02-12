@@ -20,7 +20,7 @@ export const textMessageController = async(req, res) => {
         chat.messages.push({role: 'user', content: prompt, timestamp: Date.now(), isImage: false})
 
         const {choices} = await openai.chat.completions.create({
-            model: "gpt-4.1-mini",
+            model: "gpt-5-mini",
             messages: [
                 
                 {

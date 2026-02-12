@@ -1,7 +1,6 @@
 import Sidebar from "./components/Sidebar"
 import ChatBox from "./components/ChatBox"
 import Credits from "./pages/Credits"
-import Community from "./pages/Community"
 import Loading from "./pages/Loading"
 import { Route, Routes, useLocation } from "react-router-dom"
 import { useState } from "react"
@@ -32,7 +31,6 @@ function App() {
           <Routes>
             <Route path="/" element={<ChatBox />} />
             <Route path="/credits" element={<Credits />} />
-            <Route path="/community" element={<Community />} />
           </Routes>
         </div>
       </div>
