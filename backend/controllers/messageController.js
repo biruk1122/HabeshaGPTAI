@@ -21,7 +21,7 @@ export const textMessageController = async(req, res) => {
 
         const {choices} = await openai.chat.completions.create({
             model: "gpt-5-mini",
-            messages: [
+            messages: [ 
                 
                 {
                     role: 'user', 
