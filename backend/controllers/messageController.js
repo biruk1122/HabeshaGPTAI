@@ -11,7 +11,7 @@ export const textMessageController = async(req, res) => {
 
         //Check credits
         if(req.user.credits < 1){
-            return res.json({sucess: false, message: "you don't have enough credits to use this feature"})
+            return res.json({success: false, message: "you don't have enough credits to use this feature"})
         }
 
         const {chatId, prompt} = req.body
@@ -21,14 +21,18 @@ export const textMessageController = async(req, res) => {
 
         const {choices} = await openai.chat.completions.create({
             model: "gpt-5-mini",
-            messages: [ 
+            // messages: [ 
                 
-                {
-                    role: 'user', 
-                    content: prompt
-                },
+            //     {
+            //         role: 'user', 
+            //         content: prompt
+            //     },
         
-            ]
+            // ]
+            messages: chat.messages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+}))
         });
 
         const reply={...choices[0].message, timestamp: Date.now(), isImage: false}
@@ -39,7 +43,7 @@ export const textMessageController = async(req, res) => {
         await User.updateOne({_id: userId}, )
 
     }catch(error){
-        res.json({sucess: false, message: error.message})
+        res.json({success: false, message: error.message})
     }
 }
 
