@@ -19,28 +19,31 @@ export const textMessageController = async(req, res) => {
         const chat = await Chat.findOne({userId, _id: chatId})
         chat.messages.push({role: 'user', content: prompt, timestamp: Date.now(), isImage: false})
 
-        const {choices} = await openai.chat.completions.create({
-            model: "gpt-5-mini",
-            // messages: [ 
-                
-            //     {
-            //         role: 'user', 
-            //         content: prompt
-            //     },
-        
-            // ]
-            messages: chat.messages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-}))
+        const response = await openai.responses.create({
+            model: process.env.OPENAI_TEXT_MODEL || "gpt-5-mini",
+            tools: [{type: "web_search"}],
+            tool_choice: "auto",
+            include: ["web_search_call.action.sources"],
+            instructions: "This chat is connected to OpenAI web search. Do not say you lack live web search. Use web search only when the user asks about current, recent, live, location-specific, price, news, weather, sports, law, product availability, or other changing information. For general knowledge, coding help, explanations, writing, math, brainstorming, and timeless questions, answer without web search. Include useful source links only when web information is used.",
+            input: chat.messages
+                .filter(msg => !msg.isImage)
+                .map(msg => ({
+                    role: msg.role === "assistant" ? "assistant" : "user",
+                    content: msg.content
+                }))
         });
 
-        const reply={...choices[0].message, timestamp: Date.now(), isImage: false}
+        const reply={
+            role: 'assistant',
+            content: response.output_text || "I couldn't generate a response.",
+            timestamp: Date.now(),
+            isImage: false
+        }
         res.json({success: true, reply})
 
         chat.messages.push(reply)
         await chat.save();
-        await User.updateOne({_id: userId}, )
+        await User.updateOne({_id: userId}, {$inc: {credits: -1}})
 
     }catch(error){
         res.json({success: false, message: error.message})
