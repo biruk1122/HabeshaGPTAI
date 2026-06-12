@@ -50,6 +50,166 @@ export const textMessageController = async(req, res) => {
     }
 }
 
+// import Chat from "../models/Chat.js";
+// import User from "../models/User.js";
+// import openai from "../configs/openai.js";
+
+// /**
+//  * Helper: build compact memory instead of full chat
+//  */
+// function buildSmartMemory(messages) {
+//     const recent = messages.slice(-12); // reduce token cost
+
+//     return recent
+//         .filter(m => !m.isImage)
+//         .map(m => ({
+//             role: m.role === "assistant" ? "assistant" : "user",
+//             content: m.content
+//         }));
+// }
+
+// /**
+//  * Optional: create short summary memory (for long chats)
+//  */
+// async function getChatSummary(messages) {
+//     if (messages.length < 20) return null;
+
+//     const summaryPrompt = messages.slice(0, -10).map(m =>
+//         `${m.role}: ${m.content}`
+//     ).join("\n");
+
+//     const res = await openai.chat.completions.create({
+//         model: "gpt-5-mini",
+//         messages: [
+//             {
+//                 role: "system",
+//                 content: "Summarize this chat in a short memory for context."
+//             },
+//             {
+//                 role: "user",
+//                 content: summaryPrompt
+//             }
+//         ]
+//     });
+
+//     return res.choices[0]?.message?.content;
+// }
+
+// export const textMessageController = async (req, res) => {
+//     try {
+//         const userId = req.user.id;
+//         const { chatId, prompt } = req.body;
+
+//         // 1. Check credits
+//         if (req.user.credits < 1) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Not enough credits"
+//             });
+//         }
+
+//         // 2. Get chat
+//         const chat = await Chat.findOne({ userId, _id: chatId });
+//         if (!chat) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "Chat not found"
+//             });
+//         }
+
+//         // 3. Save user message
+//         chat.messages.push({
+//             role: "user",
+//             content: prompt,
+//             timestamp: Date.now(),
+//             isImage: false
+//         });
+
+//         // 4. Smart memory (cheap + fast)
+//         const memory = buildSmartMemory(chat.messages);
+
+//         // 5. Streaming headers
+//         res.setHeader("Content-Type", "text/event-stream");
+//         res.setHeader("Cache-Control", "no-cache");
+//         res.setHeader("Connection", "keep-alive");
+
+//         let fullResponse = "";
+//         let sources = [];
+
+//         // 6. OpenAI streaming with web search
+//         const stream = await openai.responses.create({
+//             model: "gpt-5-mini",
+//             tools: [{ type: "web_search" }],
+//             tool_choice: "required",
+//             include: ["web_search_call.action.sources"],
+//             input: [
+//                 ...memory,
+//                 { role: "user", content: prompt }
+//             ],
+//             stream: true
+//         });
+
+//         for await (const event of stream) {
+
+//             // TEXT STREAMING
+//             if (event.type === "response.output_text.delta") {
+//                 const chunk = event.delta;
+//                 fullResponse += chunk;
+
+//                 res.write(`data: ${JSON.stringify({
+//                     type: "token",
+//                     text: chunk
+//                 })}\n\n`);
+//             }
+
+//             // CAPTURE SOURCES
+//             if (event.type === "response.web_search_call.completed") {
+//                 sources = event.sources || [];
+//             }
+//         }
+
+//         // 7. Save assistant message
+//         const reply = {
+//             role: "assistant",
+//             content: fullResponse,
+//             timestamp: Date.now(),
+//             isImage: false,
+//             sources
+//         };
+
+//         chat.messages.push(reply);
+
+//         // 8. Optional chat summary (memory optimization)
+//         const summary = await getChatSummary(chat.messages);
+//         if (summary) {
+//             chat.summary = summary;
+//         }
+
+//         await chat.save();
+
+//         // 9. Deduct credits
+//         await User.updateOne(
+//             { _id: userId },
+//             { $inc: { credits: -1 } }
+//         );
+
+//         // 10. Send final event
+//         res.write(`data: ${JSON.stringify({
+//             type: "done",
+//             reply
+//         })}\n\n`);
+
+//         res.end();
+
+//     } catch (error) {
+//         console.log(error);
+//         res.status(500).json({
+//             success: false,
+//             message: error.message
+//         });
+//     }
+// };
+
 // AI Image-based message controller
 export const imageMessageController = async(req, res) => {
     try{
@@ -98,6 +258,6 @@ export const imageMessageController = async(req, res) => {
         await User.updateOne({_id: userId}, {$inc: {credits: -2}})
 
         }catch(error){
-            res.json({sucess: false, message: error.message})
+            res.json({success: false, message: error.message})
         }
     }
