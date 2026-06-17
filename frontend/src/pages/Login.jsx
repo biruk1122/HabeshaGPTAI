@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 
 function Login() {
 
-     const [state, setState] = useState("login");
+    const [state, setState] = useState("login");
     const [username, setUserName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -15,7 +15,21 @@ function Login() {
         // Handle login or registration logic here
         const url = state === 'login' ? '/api/user/login' : '/api/user/register'
         try{
-           const {data} = await axios.post(url, {username, email, password})
+                
+    const payload =
+      state === "login"
+        ? {
+            email,
+            password,
+          } 
+        : {
+            username,
+            email,
+            password,
+          }; 
+
+    
+           const {data} = await axios.post(url, payload)
            if(data.success){
             setToken(data.token)
             localStorage.setItem('token', data.token)
