@@ -11,7 +11,7 @@ import { useAppContext } from "../contexts/AppContext";
 		const timer=setTimeout(()=>{
 			fetchUser()
 			navigate('/')
-		},8000)
+		},3000)
 		return ()=>clearTimeout(timer)
  
 	},[])
