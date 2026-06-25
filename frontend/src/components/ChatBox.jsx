@@ -6,18 +6,18 @@ import toast from "react-hot-toast"
 
 function ChatBox() {
 
-  const containerRef=useRef(null)
+  const containerRef = useRef(null)
 
   const {selectedChat,theme, user, axios, token, setUser} = useAppContext()
 
-  const[messages, setMessages]=useState([])
-  const[loading, setLoading]=useState(false)
+  const[messages, setMessages] = useState([])
+  const[loading, setLoading] = useState(false)
 
-  const[prompt,setPrompt]=useState("")
-  const[mode,setMode]=useState("text")
-  const[isPublished,setIsPublished]=useState(false)
+  const[prompt,setPrompt] = useState("")
+  const[mode,setMode] = useState("text")
+  const[isPublished,setIsPublished] = useState(false)
 
-  const onSubmit= async(e)=>{
+  const onSubmit = async(e)=>{
     try{
       e.preventDefault()
       if(!user) return toast('Login to send message')
@@ -44,7 +44,6 @@ function ChatBox() {
     }catch(error){
       toast.error(error.message)
     }finally{
-      setPrompt('')
       setLoading(false)
     }
   }
@@ -81,13 +80,6 @@ function ChatBox() {
         <div className="w-1.5 h-1.5 rounded-full bg-gray-500 dark:bg-white animate-bounce"></div>
       </div>)}
     </div>
-
-    {mode === 'image'&&(
-      <label className="inline-flex items-center gap-2 mb-3 text-sm mx-auto">
-        {/* <p className="text-xs">Published Generated Image to Community</p> */}
-        <input type='' className="cursore-pointer" checked={isPublished} onChange={(e)=>setIsPublished(e.target.checked)}/>
-      </label>
-    )}
 
   {/* Input box */}
   <form onSubmit={onSubmit} className="bg-primary/20 dark:bg-[#583C79]/30 border border-primary dark:border-[#80609F]/30 rounded-full w-full max-w-2xl p-3 pl-4 mx-auto flex gap-4 items-center">
