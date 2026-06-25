@@ -1,263 +1,153 @@
-import axios from 'axios'
+import axios from "axios";
 import Chat from "../models/Chat.js";
 import User from "../models/User.js";
-import imagekit from '../configs/imageKit.js';
-import openai from '../configs/openai.js'
+import imagekit from "../configs/imageKit.js";
+import gemini from "../configs/openai.js";
 
-// AI Text-based message controller
-export const textMessageController = async(req, res) => {
-    try{
-        const userId = req.user.id;
+// AI Text-based message controller - using Google Gemini API
+export const textMessageController = async (req, res) => {
+  try {
+    const userId = req.user.id;
 
-        //Check credits
-        if(req.user.credits < 1){
-            return res.json({success: false, message: "you don't have enough credits to use this feature"})
-        }
+    //Always get fresh user from DB to ensure credits are up-to-date
+    const user = await User.findById(userId);
 
-        const {chatId, prompt} = req.body
-
-        const chat = await Chat.findOne({userId, _id: chatId})
-        chat.messages.push({role: 'user', content: prompt, timestamp: Date.now(), isImage: false})
-
-        const response = await openai.responses.create({
-            model: process.env.OPENAI_TEXT_MODEL || "gpt-5-mini",
-            tools: [{type: "web_search"}],
-            tool_choice: "auto",
-            include: ["web_search_call.action.sources"],
-            instructions: "This chat is connected to OpenAI web search. Do not say you lack live web search. Use web search only when the user asks about current, recent, live, location-specific, price, news, weather, sports, law, product availability, or other changing information. For general knowledge, coding help, explanations, writing, math, brainstorming, and timeless questions, answer without web search. Include useful source links only when web information is used.",
-            input: chat.messages
-                .filter(msg => !msg.isImage)
-                .map(msg => ({
-                    role: msg.role === "assistant" ? "assistant" : "user",
-                    content: msg.content
-                }))
-        });
-
-        const reply={
-            role: 'assistant',
-            content: response.output_text || "I couldn't generate a response.",
-            timestamp: Date.now(),
-            isImage: false
-        }
-        res.json({success: true, reply})
-
-        chat.messages.push(reply)
-        await chat.save();
-        await User.updateOne({_id: userId}, {$inc: {credits: -1}})
-
-    }catch(error){
-        res.json({success: false, message: error.message})
+    //Check credits
+    if (user.credits < 1) {
+      return res.json({
+        success: false,
+        message: "you don't have enough credits to use this feature",
+      });
     }
-}
 
-// import Chat from "../models/Chat.js";
-// import User from "../models/User.js";
-// import openai from "../configs/openai.js";
+    const { chatId, prompt } = req.body;
 
-// /**
-//  * Helper: build compact memory instead of full chat
-//  */
-// function buildSmartMemory(messages) {
-//     const recent = messages.slice(-12); // reduce token cost
+    const chat = await Chat.findOne({ userId, _id: chatId });
+    chat.messages.push({
+      role: "user",
+      content: prompt,
+      timestamp: Date.now(),
+      isImage: false,
+    });
 
-//     return recent
-//         .filter(m => !m.isImage)
-//         .map(m => ({
-//             role: m.role === "assistant" ? "assistant" : "user",
-//             content: m.content
-//         }));
-// }
+    // Build conversation history for Gemini (keep last 10 messages to save tokens)
+    const recentMessages = chat.messages
+      .filter((msg) => !msg.isImage)
+      
+    //Safty (Prevent huge context crash, Not limiting user)
+    const MAX_MESSAGES = 100;
+    const safeMessages = recentMessages.length > MAX_MESSAGES ? recentMessages.slice(-MAX_MESSAGES) : recentMessages;
 
-// /**
-//  * Optional: create short summary memory (for long chats)
-//  */
-// async function getChatSummary(messages) {
-//     if (messages.length < 20) return null;
+    const history = safeMessages.map((msg) => ({
+      role: msg.role === "assistant" ? "model" : "user",
+      parts: [{ text: msg.content }],
+    }));
 
-//     const summaryPrompt = messages.slice(0, -10).map(m =>
-//         `${m.role}: ${m.content}`
-//     ).join("\n");
+        // Use Gemini 2.5 Flash as default with Google Search grounding for current data
+        const result = await gemini.models.generateContent({
+            model: "gemini-2.5-flash",
+      contents: [
+        ...history,
+        {
+          role: "user",
+          parts: [{ text: prompt }],
+        },
+      ],
+      config: {
+        systemInstruction: {
+          parts: [
+            {
+              text: "You are HabeshaGPT, a helpful AI assistant. Answer questions accurately and concisely. Today's date is " + new Date().toISOString().split('T')[0] + ". Use Google Search when the user asks about current events, news, weather, sports, prices, recent information, or any time-sensitive data. For general knowledge, coding, explanations, writing, math, and brainstorming, answer from your knowledge.",
+            },
+          ],
+        },
+        tools: [{ googleSearch: {} }]
+      },
+    });
 
-//     const res = await openai.chat.completions.create({
-//         model: "gpt-5-mini",
-//         messages: [
-//             {
-//                 role: "system",
-//                 content: "Summarize this chat in a short memory for context."
-//             },
-//             {
-//                 role: "user",
-//                 content: summaryPrompt
-//             }
-//         ]
-//     });
+    const responseText =
+      result.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "I couldn't generate a response.";
 
-//     return res.choices[0]?.message?.content;
-// }
+    const reply = {
+      role: "assistant",
+      content: responseText,
+      timestamp: Date.now(),
+      isImage: false,
+    };
+    res.json({ success: true, reply });
 
-// export const textMessageController = async (req, res) => {
-//     try {
-//         const userId = req.user.id;
-//         const { chatId, prompt } = req.body;
+    chat.messages.push(reply);
+    await chat.save();
 
-//         // 1. Check credits
-//         if (req.user.credits < 1) {
-//             return res.status(400).json({
-//                 success: false,
-//                 message: "Not enough credits"
-//             });
-//         }
+    await User.findByIdAndUpdate( userId , { $inc: { credits: -1 } });
 
-//         // 2. Get chat
-//         const chat = await Chat.findOne({ userId, _id: chatId });
-//         if (!chat) {
-//             return res.status(404).json({
-//                 success: false,
-//                 message: "Chat not found"
-//             });
-//         }
+    req.user.credits = user.credits - 1; 
 
-//         // 3. Save user message
-//         chat.messages.push({
-//             role: "user",
-//             content: prompt,
-//             timestamp: Date.now(),
-//             isImage: false
-//         });
-
-//         // 4. Smart memory (cheap + fast)
-//         const memory = buildSmartMemory(chat.messages);
-
-//         // 5. Streaming headers
-//         res.setHeader("Content-Type", "text/event-stream");
-//         res.setHeader("Cache-Control", "no-cache");
-//         res.setHeader("Connection", "keep-alive");
-
-//         let fullResponse = "";
-//         let sources = [];
-
-//         // 6. OpenAI streaming with web search
-//         const stream = await openai.responses.create({
-//             model: "gpt-5-mini",
-//             tools: [{ type: "web_search" }],
-//             tool_choice: "required",
-//             include: ["web_search_call.action.sources"],
-//             input: [
-//                 ...memory,
-//                 { role: "user", content: prompt }
-//             ],
-//             stream: true
-//         });
-
-//         for await (const event of stream) {
-
-//             // TEXT STREAMING
-//             if (event.type === "response.output_text.delta") {
-//                 const chunk = event.delta;
-//                 fullResponse += chunk;
-
-//                 res.write(`data: ${JSON.stringify({
-//                     type: "token",
-//                     text: chunk
-//                 })}\n\n`);
-//             }
-
-//             // CAPTURE SOURCES
-//             if (event.type === "response.web_search_call.completed") {
-//                 sources = event.sources || [];
-//             }
-//         }
-
-//         // 7. Save assistant message
-//         const reply = {
-//             role: "assistant",
-//             content: fullResponse,
-//             timestamp: Date.now(),
-//             isImage: false,
-//             sources
-//         };
-
-//         chat.messages.push(reply);
-
-//         // 8. Optional chat summary (memory optimization)
-//         const summary = await getChatSummary(chat.messages);
-//         if (summary) {
-//             chat.summary = summary;
-//         }
-
-//         await chat.save();
-
-//         // 9. Deduct credits
-//         await User.updateOne(
-//             { _id: userId },
-//             { $inc: { credits: -1 } }
-//         );
-
-//         // 10. Send final event
-//         res.write(`data: ${JSON.stringify({
-//             type: "done",
-//             reply
-//         })}\n\n`);
-
-//         res.end();
-
-//     } catch (error) {
-//         console.log(error);
-//         res.status(500).json({
-//             success: false,
-//             message: error.message
-//         });
-//     }
-// };
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
 
 // AI Image-based message controller
-export const imageMessageController = async(req, res) => {
-    try{
-        const userId = req.user.id;
-        if (req.user.credits < 2){
-            return res.json({success: false, message: "You don't have enough credits"})
-        }
-
-        const {prompt, chatId, isPublished} = req.body;
-        const chat = await Chat.findOne({userId, _id: chatId})
-
-        chat.messages.push({role: 'user', content: prompt, timestamp: Date.now(), isImage: false})
-
-        //Encode the prompt
-        const encodedPrompt = encodeURIComponent(prompt);
-
-        //Construct the image URL using ImageKit's URL endpoint and transformation parameters
-        const generatedImageUrl = `${process.env.IMAGEKIT_URL_ENDPOINT}/ik-genimg-prompt-${encodedPrompt}/habeshagpt/${Date.now()}.jpg?tr=w-800,h-800`
-
-        //Trigger generation by fetching from imagekit
-        const aiImageResponse = await axios.get(generatedImageUrl, {responseType: 'arraybuffer'});
-
-        //Convert to Base64
-        const base64Image = `data:image/jpg;base64,${Buffer.from(aiImageResponse.data,'binary').toString('base64')}`
-
-        //Upload to ImageKit Media Library
-        const uploadResponse = await imagekit.upload({
-            file: base64Image,
-            fileName: `${Date.now()}.jpg`,
-            folder: 'habeshagpt'
-        })
-
-        const reply = {
-            role: 'assistant',
-            content: uploadResponse.url,
-            timestamp: Date.now(), 
-            isImage: true,
-            isPublished
-        }
-
-        res.json({success: true, reply})
-
-        chat.messages.push(reply)
-        await chat.save()
-
-        await User.updateOne({_id: userId}, {$inc: {credits: -2}})
-
-        }catch(error){
-            res.json({success: false, message: error.message})
-        }
+export const imageMessageController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+    
+    if (user.credits < 2) {
+      return res.json({
+        success: false,
+        message: "You don't have enough credits",
+      });
     }
+
+    const { prompt, chatId, isPublished } = req.body;
+    const chat = await Chat.findOne({ userId, _id: chatId });
+
+    chat.messages.push({
+      role: "user",
+      content: prompt,
+      timestamp: Date.now(),
+      isImage: false,
+    });
+
+    //Encode the prompt
+    const encodedPrompt = encodeURIComponent(prompt);
+
+    //Construct the image URL using ImageKit's URL endpoint and transformation parameters
+    const generatedImageUrl = `${process.env.IMAGEKIT_URL_ENDPOINT}/ik-genimg-prompt-${encodedPrompt}/habeshagpt/${Date.now()}.jpg?tr=w-800,h-800`;
+
+    //Trigger generation by fetching from imagekit
+    const aiImageResponse = await axios.get(generatedImageUrl, {
+      responseType: "arraybuffer",
+    });
+
+    //Convert to Base64
+    const base64Image = `data:image/jpg;base64,${Buffer.from(aiImageResponse.data, "binary").toString("base64")}`;
+
+    //Upload to ImageKit Media Library
+    const uploadResponse = await imagekit.upload({
+      file: base64Image,
+      fileName: `${Date.now()}.jpg`,
+      folder: "habeshagpt",
+    });
+
+    const reply = {
+      role: "assistant",
+      content: uploadResponse.url,
+      timestamp: Date.now(),
+      isImage: true,
+      isPublished,
+    };
+
+    res.json({ success: true, reply });
+
+    chat.messages.push(reply);
+    await chat.save();
+
+    await User.findByIdAndUpdate( userId , { $inc: { credits: -2 } });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
